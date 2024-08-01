@@ -3,7 +3,7 @@
 </p>
 
 ## How does it work?
-Parses 'Copy as fetch' of a license request, locates the challenge if license wrapping is being used, extracts the pssh data and re-sends the request. No Manifest, Cookies or License wrapping integration required. 
+Parses 'Copy as fetch' of a license request, locates the challenge if license wrapping is being used, extracts the PSSH data and re-sends the request. No Manifest, Cookies or License wrapping integration required. 
 
 ## Requirements
 + [L3 CDM](https://forum.videohelp.com/threads/408031-Dumping-Your-own-L3-CDM-with-Android-Studio)
