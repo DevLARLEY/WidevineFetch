@@ -97,7 +97,7 @@ class ProcessorSignals(QObject):
 
 
 class AsyncProcessor(QRunnable):
-    CDM_DIR = '../cdm'
+    CDM_DIR = 'cdm'
 
     def __init__(
             self,
