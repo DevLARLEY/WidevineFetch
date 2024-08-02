@@ -338,8 +338,8 @@ class AsyncProcessor(QRunnable):
         if not (pssh := self._extract_pssh(challenge)):
             if pssh == "":
                 return
-            if (pssh := self.pssh) is None:
-                self.log_error("Enter the PSSH manually, as the request body is empty", False)
+            if pssh is None and not (pssh := self.pssh):
+                self.log_error("Enter the PSSH manually, as the request body is empty")
                 return
 
         if not (devices := glob.glob(join(self.CDM_DIR, '*.wvd'))):
