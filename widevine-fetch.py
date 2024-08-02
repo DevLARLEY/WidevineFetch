@@ -67,7 +67,6 @@ class WidevineFetch(QWidget):
         self.text_edit.append(f'[WARNING] {message}')
 
     def error(self, message: str):
-        self.text_edit.clear()
         QMessageBox.critical(
             self,
             "WidevineFetch/Error",
@@ -75,6 +74,9 @@ class WidevineFetch(QWidget):
             buttons=QMessageBox.Ok,
             defaultButton=QMessageBox.Ok,
         )
+
+    def clear(self):
+        self.text_edit.clear()
 
     def start_process(
             self,
@@ -84,6 +86,7 @@ class WidevineFetch(QWidget):
         processor.signals.info.connect(self.info)
         processor.signals.warning.connect(self.warning)
         processor.signals.error.connect(self.error)
+        processor.signals.clear.connect(self.clear)
         POOL.start(processor)
 
         self.text_edit.clear()
@@ -94,6 +97,7 @@ class ProcessorSignals(QObject):
     info = pyqtSignal(str)
     warning = pyqtSignal(str)
     error = pyqtSignal(str)
+    clear = pyqtSignal()
 
 
 class AsyncProcessor(QRunnable):
@@ -116,8 +120,10 @@ class AsyncProcessor(QRunnable):
     def log_warning(self, message: str):
         self.signals.warning.emit(message)
 
-    def log_error(self, message: str):
+    def log_error(self, message: str, clear: bool = True):
         self.signals.error.emit(message)
+        if clear:
+            self.signals.clear.emit()
 
     @pyqtSlot()
     def run(self):
@@ -258,8 +264,8 @@ class AsyncProcessor(QRunnable):
             if pssh.system_id == PSSH.SystemId.Widevine:
                 return pssh.dumps()
 
-    @staticmethod
     def _extract_pssh(
+            self,
             message: str | bytes
     ) -> str | None:
         if not message:
@@ -275,7 +281,11 @@ class AsyncProcessor(QRunnable):
             return
 
         license_request = LicenseRequest()
-        license_request.ParseFromString(signed_message.msg)
+        try:
+            license_request.ParseFromString(signed_message.msg)
+        except Exception:
+            self.log_error("Unable to parse request body")
+            return ""
 
         request_json = MessageToDict(license_request)
         if not (content_id := request_json.get('contentId')):
@@ -325,9 +335,11 @@ class AsyncProcessor(QRunnable):
             return
 
         self.log_info("Obtaining pssh...")
-        if not (pssh := AsyncProcessor._extract_pssh(challenge)):
-            if not (pssh := self.pssh):
-                self.log_error("Enter the PSSH manually, as the request body is empty")
+        if not (pssh := self._extract_pssh(challenge)):
+            if pssh == "":
+                return
+            if (pssh := self.pssh) is None:
+                self.log_error("Enter the PSSH manually, as the request body is empty", False)
                 return
 
         if not (devices := glob.glob(join(self.CDM_DIR, '*.wvd'))):
