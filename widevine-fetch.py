@@ -271,11 +271,16 @@ class AsyncProcessor(QRunnable):
         if not message:
             return
 
+        print(f"License Request => {base64.b64encode(message).decode()}")
+
         if isinstance(message, str):
             message = base64.b64decode(message)
 
         signed_message = SignedMessage()
-        signed_message.ParseFromString(message)
+        try:
+            signed_message.ParseFromString(message)
+        except Exception:
+            return ""
 
         if signed_message.type != SignedMessage.MessageType.Value("LICENSE_REQUEST"):
             return
@@ -284,7 +289,6 @@ class AsyncProcessor(QRunnable):
         try:
             license_request.ParseFromString(signed_message.msg)
         except Exception:
-            self.log_error("Unable to parse request body")
             return ""
 
         request_json = MessageToDict(license_request)
@@ -336,7 +340,11 @@ class AsyncProcessor(QRunnable):
 
         self.log_info("Obtaining pssh...")
         if not (pssh := self._extract_pssh(challenge)):
-            if pssh == "":
+            if pssh == "" and not (pssh := self.pssh):
+                self.log_error(
+                    "Failed to parse request body, enter PSSH manually.\n"
+                    "This shouldn't happen though, please report this on GitHub."
+                )
                 return
             if pssh is None and not (pssh := self.pssh):
                 self.log_error("Enter the PSSH manually, as the request body is empty")
@@ -418,7 +426,7 @@ class AsyncProcessor(QRunnable):
 
 if __name__ == '__main__':
     if sys.platform == "win32":
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ModularDL")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("WidevineFetch")
     app = QApplication(sys.argv)
     wvf = WidevineFetch()
     wvf.show()
