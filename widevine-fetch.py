@@ -26,8 +26,6 @@ class PlainTextEdit(QTextEdit):
 
 
 class WidevineFetch(QWidget):
-    result_signal = pyqtSignal(str)
-
     def __init__(self):
         """
         Parse 'Copy as fetch' of a license request and parse its data accordingly.
@@ -336,10 +334,11 @@ class AsyncProcessor(QRunnable):
                     self.log_error("Unable to encode license request, please report this on GitHub.")
                     return
 
-        if challenge == b'\x08\x04':
+        if challenge == b'\x08\x04' and not self.pssh:
             self.log_error(
                 "Certificate Request detected. "
-                "Paste 'Copy as fetch' of the second license URL. The one that has the actual license request"
+                "Paste 'Copy as fetch' of the second license URL. The one that has the actual license request\n"
+                "If you've blocked a request and see this message, enter the PSSH manually."
             )
             return
 
