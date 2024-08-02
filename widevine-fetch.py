@@ -329,7 +329,12 @@ class AsyncProcessor(QRunnable):
             # assume bytes
             challenge = body
             if body:
-                challenge = body.encode('ISO-8859-1')
+                try:
+                    challenge = body.encode('ISO-8859-1')
+                except Exception as ex:
+                    print(ex)
+                    self.log_error("Unable to encode license request, please report this on GitHub.")
+                    return
 
         if challenge == b'\x08\x04':
             self.log_error(
