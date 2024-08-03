@@ -59,7 +59,7 @@ class WidevineFetch(QWidget):
         self.process_button.clicked.connect(self.start_process)
         layout.addWidget(self.process_button)
 
-        self.label = QLabel("The fetch string is retrieved from the clipboard", self)
+        self.label = QLabel("The fetch string is automatically retrieved from the clipboard", self)
         layout.addWidget(self.label)
 
         self.setLayout(layout)
@@ -87,7 +87,7 @@ class WidevineFetch(QWidget):
         except Exception as ex:
             self.error(f"Unable to get fetch from clipboard: {ex}")
             return
-        
+
         print(f"User clipboard => \n{clipboard}")
 
         processor = AsyncProcessor(self.line_edit.text(), clipboard)
