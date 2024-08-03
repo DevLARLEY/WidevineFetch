@@ -16,8 +16,7 @@ Parses 'Copy as fetch' of a license request, locates the challenge if license wr
 ## Usage
 1. Play a DRM protected video
 2. Click `Copy -> Copy as fetch` on **the second license URL (the one with the long payload)**
-3. Paste that into the TextEdit Box.
-4. Click `Process`
+3. Click `Process`
 
 ## Demo
 [demo.webm](https://github.com/user-attachments/assets/fc3be401-0bf5-46b3-a051-6194bcbe97e9)
