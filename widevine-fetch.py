@@ -13,7 +13,7 @@ from PyQt5.QtCore import QThreadPool, pyqtSignal, pyqtSlot, QRunnable, QObject
 from PyQt5.QtGui import QIcon, QFont
 from google.protobuf.json_format import MessageToDict
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QApplication, QMessageBox, QLineEdit
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QApplication, QMessageBox, QLineEdit, QLabel
 
 from pywidevine import PSSH, Device, Cdm
 from pywidevine.license_protocol_pb2 import SignedMessage, LicenseRequest, WidevinePsshData
@@ -59,6 +59,9 @@ class WidevineFetch(QWidget):
         self.process_button.clicked.connect(self.start_process)
         layout.addWidget(self.process_button)
 
+        self.label = QLabel("The fetch string is retrieved from the clipboard", self)
+        layout.addWidget(self.label)
+
         self.setLayout(layout)
 
     def info(self, message: str):
@@ -84,6 +87,8 @@ class WidevineFetch(QWidget):
         except Exception as ex:
             self.error(f"Unable to get fetch from clipboard: {ex}")
             return
+        
+        print(f"User clipboard => \n{clipboard}")
 
         processor = AsyncProcessor(self.line_edit.text(), clipboard)
         processor.signals.info.connect(self.info)
