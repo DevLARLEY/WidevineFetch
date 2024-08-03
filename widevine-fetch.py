@@ -4,7 +4,7 @@ import glob
 import json
 import sys
 import re
-from os.path import join
+from os.path import join, abspath, dirname
 from typing import Any
 
 import pyperclip
@@ -354,7 +354,7 @@ class AsyncProcessor(QRunnable):
                 self.log_error("Enter the PSSH manually, as the request body is empty")
                 return
 
-        if not (devices := glob.glob(join(self.CDM_DIR, '*.wvd'))):
+        if not (devices := glob.glob(join(dirname(abspath(__file__)), self.CDM_DIR, '*.wvd'))):
             self.log_error(f"No widevine devices detected inside the {self.CDM_DIR!r} directory")
             return
 
