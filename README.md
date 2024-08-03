@@ -19,4 +19,7 @@ Parses 'Copy as fetch' of a license request, locates the challenge if license wr
 3. Click `Process`
 
 ## Demo
+> [!NOTE]  
+> This video is somewhat outdated, as you don't have to paste the string anymore. It'll be retrieved from your clipboard automatically.
+
 [demo.webm](https://github.com/user-attachments/assets/fc3be401-0bf5-46b3-a051-6194bcbe97e9)
