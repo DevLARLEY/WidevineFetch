@@ -2,3 +2,4 @@ requests
 pywidevine
 PyQt5
 google-api-python-client
+pyperclip
