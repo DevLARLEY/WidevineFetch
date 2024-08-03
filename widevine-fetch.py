@@ -37,7 +37,7 @@ class WidevineFetch(QWidget):
         super().__init__()
         self.resize(535, 535)
         self.setWindowTitle("WidevineFetch by github.com/DevLARLEY")
-        self.setWindowIcon(QIcon("logo-small.png"))
+        self.setWindowIcon(QIcon(join(dirname(abspath(__file__)), "logo-small.png")))
 
         layout = QVBoxLayout()
 
