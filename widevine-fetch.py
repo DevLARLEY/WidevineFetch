@@ -7,9 +7,10 @@ import re
 from os.path import join
 from typing import Any
 
+import pyperclip
 import requests
 from PyQt5.QtCore import QThreadPool, pyqtSignal, pyqtSlot, QRunnable, QObject
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QFont
 from google.protobuf.json_format import MessageToDict
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QApplication, QMessageBox, QLineEdit
@@ -34,13 +35,17 @@ class WidevineFetch(QWidget):
         """
 
         super().__init__()
-        self.resize(960, 480)
+        self.resize(535, 535)
         self.setWindowTitle("WidevineFetch by github.com/DevLARLEY")
         self.setWindowIcon(QIcon("logo-small.png"))
 
         layout = QVBoxLayout()
 
         self.text_edit = PlainTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        mono = QFont()
+        mono.setFamily("Courier New")
+        self.text_edit.setFont(mono)
         layout.addWidget(self.text_edit)
 
         self.line_edit = QLineEdit(self)
@@ -51,9 +56,7 @@ class WidevineFetch(QWidget):
         layout.addWidget(self.line_edit)
 
         self.process_button = QPushButton("Process", self)
-        self.process_button.clicked.connect(lambda _: self.start_process(
-            self.text_edit.toPlainText().replace('\n', '')
-        ))
+        self.process_button.clicked.connect(self.start_process)
         layout.addWidget(self.process_button)
 
         self.setLayout(layout)
@@ -73,21 +76,21 @@ class WidevineFetch(QWidget):
             defaultButton=QMessageBox.Ok,
         )
 
-    def clear(self):
+    def start_process(self):
         self.text_edit.clear()
 
-    def start_process(
-            self,
-            read: str
-    ):
-        processor = AsyncProcessor(self.line_edit.text(), read)
+        try:
+            clipboard = pyperclip.paste().replace('\n', '')
+        except Exception as ex:
+            self.error(f"Unable to get fetch from clipboard: {ex}")
+            return
+
+        processor = AsyncProcessor(self.line_edit.text(), clipboard)
         processor.signals.info.connect(self.info)
         processor.signals.warning.connect(self.warning)
         processor.signals.error.connect(self.error)
-        processor.signals.clear.connect(self.clear)
         POOL.start(processor)
 
-        self.text_edit.clear()
         self.line_edit.clear()
 
 
@@ -95,7 +98,6 @@ class ProcessorSignals(QObject):
     info = pyqtSignal(str)
     warning = pyqtSignal(str)
     error = pyqtSignal(str)
-    clear = pyqtSignal()
 
 
 class AsyncProcessor(QRunnable):
@@ -118,10 +120,8 @@ class AsyncProcessor(QRunnable):
     def log_warning(self, message: str):
         self.signals.warning.emit(message)
 
-    def log_error(self, message: str, clear: bool = True):
+    def log_error(self, message: str):
         self.signals.error.emit(message)
-        if clear:
-            self.signals.clear.emit()
 
     @pyqtSlot()
     def run(self):
@@ -144,7 +144,7 @@ class AsyncProcessor(QRunnable):
                 headers=data.get('headers'),
                 body=body
         ):
-            self.log_info(' '.join(sum([['--key', i] for i in keys], [])))
+            self.log_info('\n' + ' '.join(sum([['--key', i] for i in keys], [])))
 
     def _parse(self) -> tuple[str, dict] | None:
         search = re.search(
