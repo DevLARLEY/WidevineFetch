@@ -158,7 +158,10 @@ class AsyncProcessor(QRunnable):
         )
         if not search or len(search.groups()) < 2:
             return
-        return search.group(1), json.loads('{' + search.group(2) + '}')
+        try:
+            return search.group(1), json.loads('{' + search.group(2) + '}')
+        except Exception:
+            pass
 
     @staticmethod
     def _is_json(response: str) -> Any | None:
@@ -360,7 +363,7 @@ class AsyncProcessor(QRunnable):
                 return
 
         if not (devices := glob.glob(join(dirname(abspath(__file__)), self.CDM_DIR, '*.wvd'))):
-            self.log_error(f"No widevine devices detected inside the {self.CDM_DIR!r} directory")
+            self.log_error(f"No widevine devices (.wvd) detected inside the {self.CDM_DIR!r} directory")
             return
 
         device = Device.load(devices[0])
@@ -373,26 +376,26 @@ class AsyncProcessor(QRunnable):
         self.log_info("Sending request...")
         if body is not None and (j := self._is_json(body)):
             if isinstance(j, dict):
-                response = requests.post(
-                    url=url,
-                    headers=headers,
-                    json=self._replace_in_dict(j, base64.b64encode(license_challenge).decode('utf-8')),
+                data = dict(
+                    json=self._replace_in_dict(j, base64.b64encode(license_challenge).decode('utf-8'))
                 )
             elif isinstance(j, list):
-                response = requests.post(
-                    url=url,
-                    headers=headers,
-                    json=self._replace_in_list(j, base64.b64encode(license_challenge).decode('utf-8')),
+                data = dict(
+                    json=self._replace_in_list(j, base64.b64encode(license_challenge).decode('utf-8'))
                 )
             else:
                 self.log_error("Unsupported original json data")
                 return
         else:
-            response = requests.post(
-                url=url,
-                headers=headers,
-                data=license_challenge,
+            data = dict(
+                data=license_challenge
             )
+
+        response = requests.post(
+            url=url,
+            headers=headers,
+            **data
+        )
 
         if response.status_code != 200:
             self.log_error(f"Unable to obtain decryption keys, got error code {response.status_code}: {response.text}")
