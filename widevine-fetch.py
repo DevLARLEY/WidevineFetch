@@ -44,6 +44,8 @@ class WidevineFetch(QWidget):
         self.setWindowIcon(QIcon(join(dirname(abspath(__file__)), "logo-small.png")))
 
         self.settings = QSettings("DevLARLEY", "WidevineFetch")
+        if self.settings.value("impersonate") is None:
+            self.settings.setValue("impersonate", False)
 
         layout = QVBoxLayout()
 
