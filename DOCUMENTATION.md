@@ -10,6 +10,10 @@
 + Set Challenge
     + A custom method for setting the Challenge in the body if advanced license wrapping techniques are being utilized
 
+The following code snippets can be copied over and modified to create a custom module. \
+Name it after your service and make sure that it ends it `.py`. Then place that file in the `modules` directory.
+YOu can open an issue if you'd like me to upload it to the GitHub repo.
+
 ## Regex
 Modules are activated by a RegEx that must **fully** match the License URL. \
 Tools like [regex101](https://regex101.com//) can help you with creating your RegEx \
