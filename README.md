@@ -18,6 +18,9 @@ Parses 'Copy as fetch' of a license request, locates the challenge if license wr
 2. Click `Copy -> Copy as fetch` on **the second license URL (the one with the long payload)**
 3. Click `Process`
 
+# Custom modules
+Take a look at the [documentation](DOCUMENTATION.md) if you want to create your own module.
+
 ## Demo
 > [!NOTE]  
 > This video is somewhat outdated, as you don't have to paste the string anymore. It'll be retrieved from your clipboard automatically.
