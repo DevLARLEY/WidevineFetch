@@ -4,16 +4,20 @@ import glob
 import json
 import sys
 import re
-from os.path import join, abspath, dirname
+from os.path import join, abspath, dirname, basename
+from types import ModuleType
 from typing import Any
 
+import importlib.util
 import pyperclip
 import requests
-from PyQt5.QtCore import QThreadPool, pyqtSignal, pyqtSlot, QRunnable, QObject
+import curl_cffi.requests as curl_requests
+from PyQt5.QtCore import QThreadPool, pyqtSignal, pyqtSlot, QRunnable, QObject, QSettings
 from PyQt5.QtGui import QIcon, QFont
 from google.protobuf.json_format import MessageToDict
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QApplication, QMessageBox, QLineEdit, QLabel
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QApplication, QMessageBox, QLineEdit, QLabel, \
+    QGroupBox, QHBoxLayout, QCheckBox
 
 from pywidevine import PSSH, Device, Cdm
 from pywidevine.license_protocol_pb2 import SignedMessage, LicenseRequest, WidevinePsshData
@@ -39,6 +43,8 @@ class WidevineFetch(QWidget):
         self.setWindowTitle("WidevineFetch by github.com/DevLARLEY")
         self.setWindowIcon(QIcon(join(dirname(abspath(__file__)), "logo-small.png")))
 
+        self.settings = QSettings("DevLARLEY", "WidevineFetch")
+
         layout = QVBoxLayout()
 
         self.text_edit = PlainTextEdit(self)
@@ -54,6 +60,16 @@ class WidevineFetch(QWidget):
             "(e.g. when blocking a license and only the license certificate request is sent)."
         )
         layout.addWidget(self.line_edit)
+
+        self.settings_box = QGroupBox("Settings", self)
+        self.settings_layout = QHBoxLayout(self.settings_box)
+        self.impersonate = QCheckBox("Impersonate Chrome", self.settings_box)
+        self.impersonate.setChecked(bool(self.settings.value("impersonate", type=bool)))
+        self.impersonate.clicked.connect(
+            lambda _: self.settings.setValue("impersonate", self.impersonate.isChecked())
+        )
+        self.settings_layout.addWidget(self.impersonate)
+        layout.addWidget(self.settings_box)
 
         self.process_button = QPushButton("Process", self)
         self.process_button.clicked.connect(self.start_process)
@@ -90,7 +106,7 @@ class WidevineFetch(QWidget):
 
         print(f"User clipboard => \n{clipboard}")
 
-        processor = AsyncProcessor(self.line_edit.text(), clipboard)
+        processor = AsyncProcessor(self.line_edit.text(), clipboard, self.impersonate.isChecked())
         processor.signals.info.connect(self.info)
         processor.signals.warning.connect(self.warning)
         processor.signals.error.connect(self.error)
@@ -107,17 +123,22 @@ class ProcessorSignals(QObject):
 
 class AsyncProcessor(QRunnable):
     CDM_DIR = 'cdm'
+    MODULE_DIR = 'modules'
 
     def __init__(
             self,
             pssh: str | None,
-            read: str
+            read: str,
+            impersonate: bool
     ):
         super().__init__()
         self.signals = ProcessorSignals()
 
         self.pssh = pssh
         self.read = read
+        self.impersonate = impersonate
+
+        self.module = None
 
     def log_info(self, message: str):
         self.signals.info.emit(message)
@@ -127,6 +148,57 @@ class AsyncProcessor(QRunnable):
 
     def log_error(self, message: str):
         self.signals.error.emit(message)
+
+    @staticmethod
+    def ensure_list(iterable):
+        if isinstance(iterable, str):
+            return [iterable]
+        return iterable
+
+    @staticmethod
+    def has_arg(
+            module: ModuleType,
+            arg: str
+    ) -> bool:
+        if module:
+            return arg in module.__dict__
+        return False
+
+    def import_module(
+            self,
+            file: str,
+            path: str
+    ):
+        try:
+            spec = importlib.util.spec_from_file_location(file, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except Exception as e:
+            self.log_error(f"Unable to load module {file!r}: {e}")
+            return
+
+        if not isinstance(module, ModuleType):
+            self.log_error(f"Module {file!r} is not a module")
+            return
+
+        return module
+
+    def find_module(
+            self,
+            url: str
+    ) -> ModuleType | None:
+        if modules := glob.glob(join(dirname(abspath(__file__)), self.MODULE_DIR, '*.py')):
+            for module in modules:
+                imported = self.import_module(basename(module), module)
+                if not imported:
+                    continue
+                if "REGEX" not in imported.__dict__:
+                    self.log_error(f"Module {module!r} does not contain a 'REGEX' variable")
+                    return
+                for regex in self.ensure_list(imported.REGEX):
+                    if re.fullmatch(regex, url):
+                        self.log_info(f"Using module {basename(module)!r}")
+                        return imported
 
     @pyqtSlot()
     def run(self):
@@ -141,12 +213,22 @@ class AsyncProcessor(QRunnable):
             self.log_error(f"Expected a POST request, not {method!r}")
             return
 
+        headers = data.get('headers')
+
         if not (body := data.get('body')):
             self.log_warning("Empty request body, continuing anyways")
 
+        self.module = self.find_module(url)
+        if self.has_arg(self.module, "IMPERSONATE"):
+            self.impersonate = self.module.IMPERSONATE
+            if self.impersonate:
+                self.log_info("Forcing impersonation, as set in the currently loaded module")
+        if self.has_arg(self.module, "MODIFY"):
+            url, headers, body = self.module.MODIFY(url, headers, body)
+
         if keys := self._get_keys(
                 url=url,
-                headers=data.get('headers'),
+                headers=headers,
                 body=body
         ):
             self.log_info('\n' + ' '.join(sum([['--key', i] for i in keys], [])))
@@ -270,8 +352,8 @@ class AsyncProcessor(QRunnable):
             if pssh.system_id == PSSH.SystemId.Widevine:
                 return pssh.dumps()
 
+    @staticmethod
     def _extract_pssh(
-            self,
             message: str | bytes
     ) -> str | None:
         if not message:
@@ -323,24 +405,33 @@ class AsyncProcessor(QRunnable):
             body: Any
     ) -> list[str] | None:
         self.log_info("Retrieving challenge...")
-        if j := self._is_json(body):
-            if isinstance(j, dict):
-                challenge = self._find_in_dict(j)
-            elif isinstance(j, list):
-                challenge = self._find_in_list(j)
-            else:
-                self.log_error("Unsupported original json data")
-                return
-        else:
-            # assume bytes
-            challenge = body
-            if body:
+        if self.has_arg(self.module, "GET_CHALLENGE"):
+            challenge = self.module.GET_CHALLENGE(body)
+            if isinstance(challenge, str):
                 try:
-                    challenge = body.encode('ISO-8859-1')
-                except Exception as ex:
-                    print(ex)
-                    self.log_error("Unable to encode license request, please report this on GitHub.")
+                    challenge = base64.b64decode(challenge.encode()).decode()
+                except Exception as e:
+                    self.log_error(f"Unable to decode base64 challenge from custom module: {e}")
                     return
+        else:
+            if j := self._is_json(body):
+                if isinstance(j, dict):
+                    challenge = self._find_in_dict(j)
+                elif isinstance(j, list):
+                    challenge = self._find_in_list(j)
+                else:
+                    self.log_error("Unsupported original json data")
+                    return
+            else:
+                # assume bytes
+                challenge = body
+                if body:
+                    try:
+                        challenge = body.encode('ISO-8859-1')
+                    except Exception as ex:
+                        print(ex)
+                        self.log_error("Unable to encode license request, please report this on GitHub.")
+                        return
 
         if challenge == b'\x08\x04' and not self.pssh:
             self.log_error(
@@ -373,29 +464,53 @@ class AsyncProcessor(QRunnable):
 
         license_challenge = cdm.get_license_challenge(session_id, PSSH(pssh))
 
-        self.log_info("Sending request...")
-        if body is not None and (j := self._is_json(body)):
-            if isinstance(j, dict):
+        self.log_info("Replacing challenge...")
+        if self.has_arg(self.module, "SET_CHALLENGE"):
+            set_challenge = self.module.SET_CHALLENGE(body, license_challenge)
+            if isinstance(set_challenge, dict):
                 data = dict(
-                    json=self._replace_in_dict(j, base64.b64encode(license_challenge).decode('utf-8'))
+                    json=set_challenge
                 )
-            elif isinstance(j, list):
+            elif isinstance(set_challenge, str):
                 data = dict(
-                    json=self._replace_in_list(j, base64.b64encode(license_challenge).decode('utf-8'))
+                    data=set_challenge
                 )
             else:
-                self.log_error("Unsupported original json data")
+                self.log_error(f"Unexpected SET_CHALLENGE return type {type(set_challenge)!r}")
                 return
         else:
-            data = dict(
-                data=license_challenge
-            )
+            if body is not None and (j := self._is_json(body)):
+                if isinstance(j, dict):
+                    data = dict(
+                        json=self._replace_in_dict(j, base64.b64encode(license_challenge).decode('utf-8'))
+                    )
+                elif isinstance(j, list):
+                    data = dict(
+                        json=self._replace_in_list(j, base64.b64encode(license_challenge).decode('utf-8'))
+                    )
+                else:
+                    self.log_error("Unsupported original json data")
+                    return
+            else:
+                data = dict(
+                    data=license_challenge
+                )
 
-        response = requests.post(
-            url=url,
-            headers=headers,
-            **data
-        )
+        self.log_info("Sending request...")
+        if self.impersonate:
+            self.log_info("Impersonating Chrome...")
+            response = curl_requests.post(
+                url=url,
+                headers=headers,
+                impersonate="chrome",
+                **data
+            )
+        else:
+            response = requests.post(
+                url=url,
+                headers=headers,
+                **data
+            )
 
         if response.status_code != 200:
             self.log_error(f"Unable to obtain decryption keys, got error code {response.status_code}: {response.text}")
