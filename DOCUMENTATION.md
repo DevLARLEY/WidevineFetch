@@ -6,9 +6,11 @@
 + Modify input
     + Modify the License URL, Headers and Body before they read the program
 + Get Challenge
-    + A custom method for retrieving the Challenge from the body if advanced license wrapping techniques are being utilized
+    + A custom method for retrieving the Challenge from the original request data
 + Set Challenge
-    + A custom method for setting the Challenge in the body if advanced license wrapping techniques are being utilized
+    + A custom method for replacing the Challenge in the original request data
++ Get License
+    + A custom method for retrieving the Challenge from the response 
 
 The following code snippets can be copied over and modified to create a custom module. \
 Name it after your service and make sure that it ends it `.py`. Then place that file in the `modules` directory.
@@ -47,12 +49,14 @@ def modify(
 MODIFY = modify
 ```
 > [!NOTE]  
-> The body is received as a string and must be returned as a string
+> The body is received as a string. The modified body must be returned as a string
 
 
 ## Get Challenge
 ```python
-def get_challenge(body: str) -> bytes | str:
+def get_challenge(
+        body: str
+) -> str | bytes:
     # <code>
     return "C..."
 
@@ -66,9 +70,9 @@ GET_CHALLENGE = get_challenge
 ## Set Challenge
 ```python
 def set_challenge(
-        body: str, 
+        body: str,
         challenge: bytes
-) -> str | dict:
+) -> str:
     # <code>
     return '{"challenge": "C..."}'
 
@@ -76,4 +80,19 @@ def set_challenge(
 SET_CHALLENGE = set_challenge
 ```
 > [!NOTE]  
-> The body is received as a string and can be returned as a string or json object (dict)
+> The body is received as a string. The modified body must be returned as a string
+
+
+## Get License
+```python
+def get_license(
+        body: str
+) -> str | bytes:
+    # <code>
+    return "C..."
+
+# Function reference
+GET_LICENSE = get_license
+```
+> [!NOTE]  
+> The body is received as a string and the challenge can be returned as bytes or base64 (str)
