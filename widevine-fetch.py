@@ -411,7 +411,7 @@ class AsyncProcessor(QRunnable):
             challenge = self.module.GET_CHALLENGE(body)
             if isinstance(challenge, str):
                 try:
-                    challenge = base64.b64decode(challenge.encode()).decode()
+                    challenge = base64.b64decode(challenge)
                 except Exception as e:
                     self.log_error(f"Unable to decode base64 challenge from custom module: {e}")
                     return
@@ -519,17 +519,20 @@ class AsyncProcessor(QRunnable):
             return
 
         self.log_info("Retrieving license...")
-        if j := self._is_json(response.text):
-            if isinstance(j, dict):
-                licence = self._find_in_dict(j)
-            elif isinstance(j, list):
-                licence = self._find_in_list(j)
-            else:
-                self.log_error("Unsupported returned json data")
-                return
+        if self.has_arg(self.module, "GET_LICENSE"):
+            licence = self.module.GET_LICENSE(response.text)
         else:
-            # assume bytes
-            licence = response.content
+            if j := self._is_json(response.text):
+                if isinstance(j, dict):
+                    licence = self._find_in_dict(j)
+                elif isinstance(j, list):
+                    licence = self._find_in_list(j)
+                else:
+                    self.log_error("Unsupported returned json data")
+                    return
+            else:
+                # assume bytes
+                licence = response.content
 
         if not licence:
             self.log_error(f"Unable to locate license in response: {response.text}")
