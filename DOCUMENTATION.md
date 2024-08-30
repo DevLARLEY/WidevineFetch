@@ -7,14 +7,33 @@
     + Modify the License URL, Headers and Body before they read the program
 + Get Challenge
     + A custom method for retrieving the Challenge from the original request data
++ Extract PSSH
+    + A custom method for extracting the PSSH from the challenge or requesting a different manifest and getting the PSSH from there.
 + Set Challenge
     + A custom method for replacing the Challenge in the original request data
 + Get License
-    + A custom method for retrieving the Challenge from the response 
+    + A custom method for retrieving the Challenge from the response
 
 The following code snippets can be copied over and modified to create a custom module. \
 Name it after your service and make sure that it ends it `.py`. Then place that file in the `modules` directory.
-You can open an issue if you'd like me to upload it to the GitHub repo.
+YOu can open an issue if you'd like me to upload it to the GitHub repo.
+
+## Logging
+Define empty variables that will be added on the module is loaded. \
+Call the following functions to print text to the logging box or open an error dialog.
+```python
+INFO = None
+# call inside a function
+INFO("<Message to print>")
+
+WARN = None
+# call inside a function
+WARN("<Message to print>")
+
+ERROR = None
+# call inside a function
+ERROR("<Error to show>")
+```
 
 ## Regex
 Modules are activated by a RegEx that must **fully** match the License URL. \
@@ -65,6 +84,23 @@ GET_CHALLENGE = get_challenge
 ```
 > [!NOTE]  
 > The body is received as a string. The Challenge can be returned as bytes or base64 (str)
+
+
+## Extract PSSH
+```python
+def extract_pssh(
+        challenge: bytes,
+        url: str,
+        headers: dict
+) -> str | None:
+    # <code>
+    return "AAAA..."
+
+# Function reference
+EXTRACT_PSSH = extract_pssh
+```
+> [!NOTE]  
+> Inform the user about the new manifest - if it exists - by sending a log message 
 
 
 ## Set Challenge
