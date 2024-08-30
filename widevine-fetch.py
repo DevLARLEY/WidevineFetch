@@ -221,10 +221,19 @@ class AsyncProcessor(QRunnable):
             self.log_warning("Empty request body, continuing anyways")
 
         self.module = self.find_module(url)
+
+        if self.has_arg(self.module, "INFO"):
+            self.module.INFO = self.log_info
+        if self.has_arg(self.module, "WARN"):
+            self.module.WARN = self.log_warning
+        if self.has_arg(self.module, "ERROR"):
+            self.module.ERROR = self.log_error
+
         if self.has_arg(self.module, "IMPERSONATE"):
             self.impersonate = self.module.IMPERSONATE
             if self.impersonate:
                 self.log_info("Forcing impersonation, as set in the currently loaded module")
+
         if self.has_arg(self.module, "MODIFY"):
             url, headers, body = self.module.MODIFY(url, headers, body)
 
@@ -444,21 +453,27 @@ class AsyncProcessor(QRunnable):
             return
 
         self.log_info("Obtaining pssh...")
-        if not (pssh := self._extract_pssh(challenge)):
-            if pssh == "" and not (pssh := self.pssh):
-                self.log_error(
-                    "Failed to parse request body, enter PSSH manually.\n"
-                    "This shouldn't happen though, please report this on GitHub."
-                )
+        if self.has_arg(self.module, "EXTRACT_PSSH"):
+            if not (pssh := self.module.EXTRACT_PSSH(challenge, url, headers)):
+                # Error handling shall be done by the module
                 return
-            if pssh is None and not (pssh := self.pssh):
-                self.log_error("Enter the PSSH manually, as the request body is empty")
-                return
+        else:
+            if not (pssh := self._extract_pssh(challenge)):
+                if pssh == "" and not (pssh := self.pssh):
+                    self.log_error(
+                        "Failed to parse request body, enter PSSH manually.\n"
+                        "This shouldn't happen though, please report this on GitHub."
+                    )
+                    return
+                if pssh is None and not (pssh := self.pssh):
+                    self.log_error("Enter the PSSH manually, as the request body is empty")
+                    return
 
         if not (devices := glob.glob(join(dirname(abspath(__file__)), self.CDM_DIR, '*.wvd'))):
             self.log_error(f"No widevine devices (.wvd) detected inside the {self.CDM_DIR!r} directory")
             return
 
+        self.log_info(f"Using device {basename(devices[0])!r}...")
         device = Device.load(devices[0])
 
         cdm = Cdm.from_device(device)
