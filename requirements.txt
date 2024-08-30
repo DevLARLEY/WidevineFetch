@@ -4,3 +4,4 @@ PyQt5
 google-api-python-client
 pyperclip
 curl-cffi
+xmltodict
