@@ -516,18 +516,26 @@ class AsyncProcessor(QRunnable):
         self.log_info("Sending request...")
         if self.impersonate:
             self.log_info("Impersonating Chrome...")
-            response = curl_requests.post(
-                url=url,
-                headers=headers,
-                impersonate="chrome",
-                **data
-            )
+            try:
+                response = curl_requests.post(
+                    url=url,
+                    headers=headers,
+                    impersonate="chrome",
+                    **data
+                )
+            except Exception as ex:
+                self.log_error(f"Impersonation License Request crashed: {ex}")
+                return
         else:
-            response = requests.post(
-                url=url,
-                headers=headers,
-                **data
-            )
+            try:
+                response = requests.post(
+                    url=url,
+                    headers=headers,
+                    **data
+                )
+            except Exception as ex:
+                self.log_error(f"License Request crashed: {ex}")
+                return
 
         if response.status_code != 200:
             self.log_error(f"Unable to obtain decryption keys, got error code {response.status_code}: {response.text}")
