@@ -568,15 +568,10 @@ class AsyncProcessor(QRunnable):
             self.log_error(f"Could not parse license {challenge!r}: {ex}")
             return
 
-        return list(
-            map(
-                lambda key: f"{key.kid.hex}:{key.key.hex()}",
-                filter(
-                    lambda key: key.type == 'CONTENT',
-                    cdm.get_keys(session_id)
-                )
-            )
-        )
+        return list(map(
+            lambda key: f"{key.kid.hex}:{key.key.hex()}",
+            cdm.get_keys(session_id, type_='CONTENT')
+        ))
 
 
 if __name__ == '__main__':
