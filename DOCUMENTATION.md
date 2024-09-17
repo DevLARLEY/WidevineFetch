@@ -19,7 +19,7 @@ Name it after your service and make sure that it ends it `.py`. Then place that 
 YOu can open an issue if you'd like me to upload it to the GitHub repo.
 
 ## Logging
-Define empty variables that will be added on the module is loaded. \
+Define empty variables that will be added when the module is loaded. \
 Call the following functions to print text to the logging box or open an error dialog.
 ```python
 INFO = None
