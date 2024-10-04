@@ -4,7 +4,7 @@ import glob
 import json
 import sys
 import re
-from os.path import join, abspath, dirname, basename
+from os.path import join, abspath, dirname, basename, isfile
 from types import ModuleType
 from typing import Any
 
@@ -484,6 +484,10 @@ class AsyncProcessor(QRunnable):
 
         if len(self.cdm) == 0:
             self.log_error(f"No widevine devices (.wvd) detected inside the {CDM_DIR!r} directory")
+            return
+
+        if not isfile(self.cdm):
+            self.log_error(f"Device file {self.cdm!r} does not exist/is not a file!")
             return
 
         self.log_info(f"Using device {self.cdm!r}...")
