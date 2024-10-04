@@ -69,9 +69,13 @@ def _extract_pssh(manifest: str) -> str:
     dict_manifest = xmltodict.parse(manifest)
     for period in _ensure_list(dict_manifest["MPD"]["Period"]):
         for ad_set in _ensure_list(period["AdaptationSet"]):
-            for content_protection in _ensure_list(ad_set["ContentProtection"]):
+            for content_protection in _ensure_list(ad_set.get("ContentProtection", [])):
                 if content_protection.get("@schemeIdUri", "").lower() == "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed":
                     return content_protection.get("cenc:pssh")
+            for representation in ad_set.get("Representation", []):
+                for content_protection in _ensure_list(representation.get("ContentProtection")):
+                    if content_protection.get("@schemeIdUri", "").lower() == "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed":
+                        return content_protection["cenc:pssh"]["#text"]
 
 
 def extract_pssh(
