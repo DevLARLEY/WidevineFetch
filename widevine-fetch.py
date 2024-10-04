@@ -51,6 +51,7 @@ class WidevineFetch(QWidget):
 
         self.text_edit = PlainTextEdit(self)
         self.text_edit.setReadOnly(True)
+        self.text_edit.setPlaceholderText("Log message")
         mono = QFont()
         mono.setFamily("Courier New")
         self.text_edit.setFont(mono)
