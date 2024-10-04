@@ -25,6 +25,7 @@ from pywidevine.license_protocol_pb2 import SignedMessage, LicenseRequest, Widev
 POOL = QThreadPool.globalInstance()
 CDM_DIR = 'cdm'
 
+
 class PlainTextEdit(QTextEdit):
     def insertFromMimeData(self, source):
         self.insertPlainText(source.text())
@@ -51,7 +52,7 @@ class WidevineFetch(QWidget):
 
         self.text_edit = PlainTextEdit(self)
         self.text_edit.setReadOnly(True)
-        self.text_edit.setPlaceholderText("Log message")
+        self.text_edit.setPlaceholderText("Log messages")
         mono = QFont()
         mono.setFamily("Courier New")
         self.text_edit.setFont(mono)
@@ -69,13 +70,17 @@ class WidevineFetch(QWidget):
 
         self.cdm = QComboBox(self.settings_box)
         for device in glob.glob(join(dirname(abspath(__file__)), CDM_DIR, '*.wvd')):
-            self.cdm.addItem(device)
+            self.cdm.addItem(basename(device))
         self.cdm.currentIndexChanged.connect(
             lambda _: self.settings.setValue("cdm", self.cdm.currentText())
         )
-        if self.settings.value("cdm") is not None:
+        self.settings.setValue("cdm", self.cdm.currentText())
+        if self.cdm.currentText():
             if (index := self.cdm.findText(self.settings.value("cdm"))) != -1:
                 self.cdm.setCurrentIndex(index)
+        else:
+            self.error(f"No widevine devices (.wvd) detected inside the {CDM_DIR!r} directory")
+            exit(1)
         self.settings_layout.addWidget(self.cdm)
 
         self.impersonate = QCheckBox("Impersonate Chrome", self.settings_box)
@@ -152,7 +157,7 @@ class AsyncProcessor(QRunnable):
         self.pssh = pssh
         self.read = read
         self.impersonate = impersonate
-        self.cdm = cdm
+        self.cdm = join(dirname(abspath(__file__)), CDM_DIR, cdm)
 
         self.module = None
 
@@ -483,15 +488,11 @@ class AsyncProcessor(QRunnable):
                     self.log_error("Enter the PSSH manually, as the request body is empty")
                     return
 
-        if len(self.cdm) == 0:
-            self.log_error(f"No widevine devices (.wvd) detected inside the {CDM_DIR!r} directory")
-            return
-
         if not isfile(self.cdm):
-            self.log_error(f"Device file {self.cdm!r} does not exist/is not a file!")
+            self.log_error(f"The Widevine Device {self.cdm!r} does not exist/is not a file!")
             return
 
-        self.log_info(f"Using device {self.cdm!r}...")
+        self.log_info(f"Using device {basename(self.cdm)!r}...")
         device = Device.load(self.cdm)
 
         cdm = Cdm.from_device(device)
