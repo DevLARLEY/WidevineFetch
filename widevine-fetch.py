@@ -4,7 +4,7 @@ import glob
 import json
 import sys
 import re
-from os.path import join, abspath, dirname, basename
+from os.path import join, abspath, dirname, basename, isfile
 from types import ModuleType
 from typing import Any
 
@@ -17,13 +17,13 @@ from PyQt5.QtGui import QIcon, QFont
 from google.protobuf.json_format import MessageToDict
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QApplication, QMessageBox, QLineEdit, QLabel, \
-    QGroupBox, QHBoxLayout, QCheckBox
+    QGroupBox, QHBoxLayout, QCheckBox, QComboBox
 
 from pywidevine import PSSH, Device, Cdm
 from pywidevine.license_protocol_pb2 import SignedMessage, LicenseRequest, WidevinePsshData
 
 POOL = QThreadPool.globalInstance()
-
+CDM_DIR = 'cdm'
 
 class PlainTextEdit(QTextEdit):
     def insertFromMimeData(self, source):
@@ -51,6 +51,7 @@ class WidevineFetch(QWidget):
 
         self.text_edit = PlainTextEdit(self)
         self.text_edit.setReadOnly(True)
+        self.text_edit.setPlaceholderText("Log message")
         mono = QFont()
         mono.setFamily("Courier New")
         self.text_edit.setFont(mono)
@@ -65,6 +66,18 @@ class WidevineFetch(QWidget):
 
         self.settings_box = QGroupBox("Settings", self)
         self.settings_layout = QHBoxLayout(self.settings_box)
+
+        self.cdm = QComboBox(self.settings_box)
+        for device in glob.glob(join(dirname(abspath(__file__)), CDM_DIR, '*.wvd')):
+            self.cdm.addItem(device)
+        self.cdm.currentIndexChanged.connect(
+            lambda _: self.settings.setValue("cdm", self.cdm.currentText())
+        )
+        if self.settings.value("cdm") is not None:
+            if (index := self.cdm.findText(self.settings.value("cdm"))) != -1:
+                self.cdm.setCurrentIndex(index)
+        self.settings_layout.addWidget(self.cdm)
+
         self.impersonate = QCheckBox("Impersonate Chrome", self.settings_box)
         self.impersonate.setChecked(bool(self.settings.value("impersonate", type=bool)))
         self.impersonate.clicked.connect(
@@ -108,7 +121,7 @@ class WidevineFetch(QWidget):
 
         print(f"User clipboard => \n{clipboard}")
 
-        processor = AsyncProcessor(self.line_edit.text(), clipboard, self.impersonate.isChecked())
+        processor = AsyncProcessor(self.line_edit.text(), clipboard, self.impersonate.isChecked(), self.cdm.currentText())
         processor.signals.info.connect(self.info)
         processor.signals.warning.connect(self.warning)
         processor.signals.error.connect(self.error)
@@ -124,14 +137,14 @@ class ProcessorSignals(QObject):
 
 
 class AsyncProcessor(QRunnable):
-    CDM_DIR = 'cdm'
     MODULE_DIR = 'modules'
 
     def __init__(
             self,
             pssh: str | None,
             read: str,
-            impersonate: bool
+            impersonate: bool,
+            cdm: str
     ):
         super().__init__()
         self.signals = ProcessorSignals()
@@ -139,6 +152,7 @@ class AsyncProcessor(QRunnable):
         self.pssh = pssh
         self.read = read
         self.impersonate = impersonate
+        self.cdm = cdm
 
         self.module = None
 
@@ -469,12 +483,16 @@ class AsyncProcessor(QRunnable):
                     self.log_error("Enter the PSSH manually, as the request body is empty")
                     return
 
-        if not (devices := glob.glob(join(dirname(abspath(__file__)), self.CDM_DIR, '*.wvd'))):
-            self.log_error(f"No widevine devices (.wvd) detected inside the {self.CDM_DIR!r} directory")
+        if len(self.cdm) == 0:
+            self.log_error(f"No widevine devices (.wvd) detected inside the {CDM_DIR!r} directory")
             return
 
-        self.log_info(f"Using device {basename(devices[0])!r}...")
-        device = Device.load(devices[0])
+        if not isfile(self.cdm):
+            self.log_error(f"Device file {self.cdm!r} does not exist/is not a file!")
+            return
+
+        self.log_info(f"Using device {self.cdm!r}...")
+        device = Device.load(self.cdm)
 
         cdm = Cdm.from_device(device)
         session_id = cdm.open()
